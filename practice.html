@@ -857,7 +857,7 @@ const BANDS = [
   ['#bandAchilles', Date.UTC(2026, 10, 26), 'τον Αχιλλέα'],        // 26 November 2026
 ];
 function renderBand() {
-  const [y, m, d] = todayKey().split('-').map(Number);
+  const [y, m, d] = dateKey().split('-').map(Number);
   for (const [sel, when, who] of BANDS) {
     const diff = Math.round((when - Date.UTC(y, m - 1, d)) / 864e5);
     const n = Math.abs(diff);
