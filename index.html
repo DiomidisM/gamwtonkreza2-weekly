@@ -1860,6 +1860,7 @@ const lbStore = {  // gamwtonkreza2's identity and name (same site, same browser
   set(k, v) { if (PRACTICE) return; try { localStorage.setItem('gamwtonkreza2.v2.' + k, JSON.stringify(v)); } catch { /* storage unavailable */ } },
 };
 const lbRounds = g => g.guesses.map((x, k) => ({ lon: x.lon, lat: x.lat, t: g.targets[k], d: x.d, pts: x.pts, ...(x.hint ? { hint: true } : {}) }));
+const lbUnround = r => ({ lon: r.lon, lat: r.lat, d: r.d, pts: r.pts, ...(r.hint ? { hint: true } : {}) });  // a tap from the board back into a saved guess
 function lbShareHash(day, g) {  // a player's week from the board -> the address of the shared view (the five clicks), or null
   const rs = g.rounds || [];
   if (rs.length !== 5 || !rs.every(r => Number.isFinite(r.lon) && Number.isFinite(r.lat))) return null;
@@ -1947,7 +1948,24 @@ async function lbLoad(force) {
   // on another device (one score a day counts, the first), so it isn't played again here
   const meRow = !S.shared && S.phase !== 'done' && lbOn() ? data.rows.find(r => r.me) : null;
   lbElsewhere = meRow ? { day, total: meRow.total } : null;
+  if (meRow && !S.guesses.length && await lbImport(day, meRow.pid)) return;
   lbRender();
+}
+// a day played on another device and not started here: its game comes from the board, is saved here and
+// shown as if played here (results, map, statistics); it is marked as sent, so it is never sent again
+async function lbImport(day, pid) {
+  let g;
+  try { g = await rpc(LB_FN.game, { p_cookie: lbId(), p_player: pid, p_day: day }); } catch (e) { return false; }
+  const rs = g && g.found && !g.locked ? g.rounds : null;
+  if (!S || S.day !== day || S.guesses.length || !Array.isArray(rs) || rs.length !== 5) return false;
+  if (!rs.every((r, k) => r.t == null || r.t === S.targets[k])) return false;  // not this day's places
+  const st = { v: SAVE_V, day, targets: S.targets.slice(), guesses: rs.map(lbUnround), round: 4, phase: 'done', lbSent: lbMark(), ...(g.late ? { arch: true } : {}) };
+  if (!validState(st)) return false;
+  S = st; view = null; lbElsewhere = null;
+  store.set('day.' + day, S);
+  clearInput(); renderAll(); focusView(true);
+  setNotice(`Το #${dayNum(day)} το έπαιξες σε άλλη συσκευή: εδώ τα αποτελέσματά σου.`);
+  return true;
 }
 let lbElsewhere = null;
 function lbRender() {
